@@ -1,0 +1,73 @@
+name: Fetch ENTSO-E day-ahead prices
+
+on:
+  schedule:
+    # ENTSO-E day-ahead prices for NL are typically published by ~13:00 CET
+    # the day before delivery. Run once in the afternoon (13:30 UTC) to
+    # pick up tomorrow's prices as soon as they land.
+    - cron: "30 13 * * *"
+  workflow_dispatch: {}  # allows manual "Run workflow" trigger from the Actions tab
+
+permissions:
+  contents: write  # needed to commit entsoe_prices.db back to the repo
+
+jobs:
+  fetch-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch tomorrow's prices
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: python entsoe_prices.py --tomorrow --store
+
+      - name: Fetch today's prices too (backfill in case tomorrow wasn't published yet)
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: python entsoe_prices.py --store
+
+      - name: Export prices to CSV
+        run: |
+          python - <<'PY'
+          import sqlite3
+          import csv
+          from pathlib import Path
+
+          conn = sqlite3.connect("entsoe_prices.db")
+          rows = conn.execute(
+              "SELECT date, hour, timestamp_utc, price_eur_per_mwh, fetched_at "
+              "FROM entsoe_prices ORDER BY date, hour"
+          ).fetchall()
+          conn.close()
+
+          Path("entsoe_prices_export.csv").write_text("")
+          with open("entsoe_prices_export.csv", "w", newline="") as f:
+              writer = csv.writer(f)
+              writer.writerow(["date", "hour", "timestamp_utc", "price_eur_per_mwh", "fetched_at"])
+              writer.writerows(rows)
+          PY
+
+      - name: Upload CSV as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: entsoe-prices-csv
+          path: entsoe_prices_export.csv
+          retention-days: 30
+
+      - name: Commit and push updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add entsoe_prices.db
+          git diff --staged --quiet || git commit -m "Update ENTSO-E prices $(date -u +%Y-%m-%d)"
+          git push
