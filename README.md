@@ -2,6 +2,10 @@
 
 Automated collection of Dutch energy market prices, fetched daily via GitHub Actions and stored in SQLite.
 
+**Live dashboard:** https://TheoRaadt.github.io/nl-energy-prices/ — a static site in `docs/`, rebuilt automatically by
+both workflows below via `export_data.py`, which turns the two SQLite databases into `docs/data/*.json`. No server,
+no build step; GitHub Pages serves `docs/` straight from `main`.
+
 ## What's in here
 
 | Script | Source | Data | Frequency | Schedule |
@@ -53,5 +57,7 @@ Both workflows live in `.github/workflows/`:
 
 - `entsoe-prices.yml` — fetches electricity prices, commits `entsoe_prices.db`, uploads `entsoe-prices-csv` artifact
 - `ttf-prices.yml` — fetches gas prices, commits `ttf_prices.db`, uploads `ttf-prices-csv` artifact
+
+Both also run `export_data.py` and commit the refreshed `docs/data/*.json`, which is what the dashboard reads.
 
 Both support `workflow_dispatch` for manual triggering from the **Actions** tab.

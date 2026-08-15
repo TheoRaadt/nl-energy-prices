@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prijspeil — NL energy price levels</title>
+<meta name="description" content="Dutch day-ahead electricity and TTF gas prices, fetched daily from ENTSO-E and Yahoo Finance and tracked like a water level." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><rect width=%2232%22 height=%2232%22 rx=%226%22 fill=%22%230b1220%22/><path d=%22M9 22 L9 10 M9 10 L14 10 M9 14 L13 14 M9 18 L13 18 M23 22 L23 10 M23 10 L18 10 M23 14 L19 14 M23 18 L19 18%22 stroke=%22%232e97f5%22 stroke-width=%222%22 stroke-linecap=%22round%22/></svg>" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="app" data-state="loading">
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand">
+        <span class="brand-mark">Prijspeil</span>
+        <span class="brand-tagline">NL energy price levels</span>
+      </div>
+      <div class="header-actions">
+        <span class="live-pill">
+          <span class="live-dot" aria-hidden="true"></span>
+          <span><span class="live-pill-word">refreshed</span> <span id="updated-relative">—</span></span>
+        </span>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg class="icon-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+          <svg class="icon-dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z"/></svg>
+        </button>
+        <a class="icon-btn" href="https://github.com/TheoRaadt/nl-energy-prices" target="_blank" rel="noopener" aria-label="View source on GitHub" title="View source on GitHub">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.29 9.4 7.86 10.93.57.1.78-.25.78-.55 0-.27-.01-1-.02-1.96-3.2.7-3.87-1.54-3.87-1.54-.53-1.33-1.28-1.69-1.28-1.69-1.05-.71.08-.7.08-.7 1.16.08 1.77 1.19 1.77 1.19 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.55-.29-5.24-1.28-5.24-5.7 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.46.11-3.05 0 0 .97-.31 3.18 1.18a11.1 11.1 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.59.23 2.76.11 3.05.74.81 1.19 1.84 1.19 3.1 0 4.43-2.7 5.4-5.27 5.69.41.36.78 1.08.78 2.17 0 1.57-.01 2.83-.01 3.22 0 .3.2.66.79.55A10.53 10.53 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5Z"/></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <div class="content">
+    <main class="wrap">
+
+      <section class="hero">
+        <div class="hero-intro">
+          <h1>The Dutch grid and the gas market that still prices it, watched daily.</h1>
+          <p>Wholesale electricity is auctioned a day ahead; gas — which usually sets the marginal price — trades continuously. Both are tracked here at their published level, the way a <em>peilschaal</em> tracks a canal.</p>
+        </div>
+
+        <div class="meters">
+          <div class="meter-card electric" id="e-meter-card">
+            <div class="meter-head">
+              <div>
+                <p class="meter-label">Electricity — day-ahead auction</p>
+                <p class="meter-sub" id="e-sub">Loading…</p>
+              </div>
+              <span class="delta-chip" id="e-delta"></span>
+            </div>
+            <div class="meter-readout">
+              <span class="meter-value tabular" id="e-value">—</span>
+              <span class="meter-unit">EUR/MWh</span>
+            </div>
+            <svg class="meter-sparkline" id="e-sparkline" aria-hidden="true"></svg>
+            <div class="level-bar">
+              <span class="level-label lo tabular">—</span>
+              <div class="level-track">
+                <div class="level-fill"></div>
+                <div class="level-marker"></div>
+              </div>
+              <span class="level-label hi tabular">—</span>
+            </div>
+          </div>
+
+          <div class="meter-card gas" id="g-meter-card">
+            <div class="meter-head">
+              <div>
+                <p class="meter-label">Gas — TTF front-month future</p>
+                <p class="meter-sub" id="g-sub">Loading…</p>
+              </div>
+              <span class="delta-chip" id="g-delta"></span>
+            </div>
+            <div class="meter-readout">
+              <span class="meter-value tabular" id="g-value">—</span>
+              <span class="meter-unit">EUR/MWh</span>
+            </div>
+            <svg class="meter-sparkline" id="g-sparkline" aria-hidden="true"></svg>
+            <div class="level-bar">
+              <span class="level-label lo tabular">—</span>
+              <div class="level-track">
+                <div class="level-fill"></div>
+                <div class="level-marker"></div>
+              </div>
+              <span class="level-label hi tabular">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section electricity" id="electricity">
+        <p class="section-domain">01 — Electricity</p>
+        <div class="section-head">
+          <h2>The day-ahead curve</h2>
+        </div>
+        <p class="section-desc">
+          NL day-ahead prices are published once daily by <strong>ENTSO-E</strong> for delivery
+          the next day, in hourly blocks. They swing with demand and, increasingly, with solar —
+          on sunny early afternoons oversupply has pushed the price below zero
+          <strong><span id="e-neg-count">0</span> times</strong> in the last
+          <span id="e-day-count">—</span> days.
+        </p>
+
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <h3>Hourly price, full window</h3>
+            <span class="caption">EUR/MWh · hover to inspect</span>
+          </div>
+          <div class="chart-scroll">
+            <div class="chart-frame" id="e-chart-frame"></div>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-tile">
+            <p class="stat-label">Today's average</p>
+            <p class="stat-value tabular" id="stat-today-avg">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Yesterday's average</p>
+            <p class="stat-value tabular" id="stat-prev-avg">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Window low</p>
+            <p class="stat-value tabular" id="stat-window-low">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Window high</p>
+            <p class="stat-value tabular" id="stat-window-high">—<span class="unit">EUR/MWh</span></p>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <h3>Today, hour by hour</h3>
+            <span class="caption" id="e-bars-caption">—</span>
+          </div>
+          <div class="chart-scroll">
+            <div class="chart-frame" id="e-bars-frame"></div>
+          </div>
+        </div>
+
+        <details class="data-table">
+          <summary>View hourly data as a table</summary>
+          <div class="table-scroll">
+            <table class="data" id="e-table">
+              <thead><tr><th>Date · hour</th><th>EUR/MWh</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+      <section class="section gas" id="gas">
+        <p class="section-domain">02 — Gas</p>
+        <div class="section-head">
+          <h2>The futures proxy</h2>
+        </div>
+
+        <div class="note">
+          <span class="note-label">Note</span>
+          <p>
+            There is no free, officially published day-ahead auction for TTF gas, and no
+            hourly TTF price exists at all. What's charted below is Yahoo Finance's delayed
+            quote for the <strong>TTF front-month calendar future</strong> (ticker <code>TTF=F</code>,
+            ICE Endex) — a close proxy for near-term gas prices, not the literal ICE Endex
+            Day-Ahead index.
+          </p>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-card-head">
+            <h3>Daily close, open–high–low–close</h3>
+            <span class="caption">EUR/MWh · hover a candle</span>
+          </div>
+          <div class="chart-scroll">
+            <div class="chart-frame" id="g-chart-frame"></div>
+          </div>
+        </div>
+
+        <div class="stat-row">
+          <div class="stat-tile">
+            <p class="stat-label">Latest close</p>
+            <p class="stat-value tabular" id="stat-gas-close">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Change vs prior close</p>
+            <p class="stat-value tabular" id="stat-gas-change">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Window low</p>
+            <p class="stat-value tabular" id="stat-gas-low">—<span class="unit">EUR/MWh</span></p>
+          </div>
+          <div class="stat-tile">
+            <p class="stat-label">Window high</p>
+            <p class="stat-value tabular" id="stat-gas-high">—<span class="unit">EUR/MWh</span></p>
+          </div>
+        </div>
+
+        <details class="data-table">
+          <summary>View daily data as a table</summary>
+          <div class="table-scroll">
+            <table class="data" id="g-table">
+              <thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap">
+        <div class="footer-grid">
+          <div>
+            <h4>Sources &amp; automation</h4>
+            <p>
+              Electricity prices come from the <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform</a>
+              (NL day-ahead auction, document type A44), fetched daily around 13:30 UTC. Gas prices come from
+              <a href="https://finance.yahoo.com/quote/TTF=F/" target="_blank" rel="noopener">Yahoo Finance's TTF=F</a> quote,
+              fetched daily around 20:00 UTC. Both runs are scheduled GitHub Actions that commit straight back into the repo —
+              there is no server behind this page.
+            </p>
+          </div>
+          <div>
+            <h4>Elsewhere</h4>
+            <div class="footer-links">
+              <a href="https://github.com/TheoRaadt/nl-energy-prices" target="_blank" rel="noopener">Source &amp; data on GitHub ↗</a>
+              <a href="https://transparency.entsoe.eu/" target="_blank" rel="noopener">ENTSO-E Transparency Platform ↗</a>
+              <a href="https://finance.yahoo.com/quote/TTF=F/" target="_blank" rel="noopener">TTF=F on Yahoo Finance ↗</a>
+            </div>
+          </div>
+        </div>
+        <div class="footer-note">
+          <p>Prices are delayed, informational, and not trading advice. "Prijspeil" borrows its name from the peilschaal — the level gauges Dutch waterways are read against — applied here to a price instead of a canal.</p>
+          <p id="updated-abs" class="tabular">—</p>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <p class="loading-note" data-only="loading">Reading the meters…</p>
+  <div class="loading-note" data-only="error">
+    <p>Couldn't load price data: <span id="error-detail"></span></p>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
