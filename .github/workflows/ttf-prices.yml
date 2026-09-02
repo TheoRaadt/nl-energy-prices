@@ -49,7 +49,26 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add ttf_prices.db docs/data/ttf.json docs/data/entsoe.json
           git diff --staged --quiet || git commit -m "Update TTF prices $(date -u +%Y-%m-%d)"
-          git push
+
+          # The push can be rejected if main moved since checkout (e.g. a
+          # manual push landed in the meantime, or the ENTSO-E workflow ran
+          # around the same time). Retry a few times, always keeping this
+          # run's freshly-fetched files on conflict.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt/5), fetching and retrying..."
+            git fetch origin main
+            git merge -X ours --no-edit origin/main || {
+              git checkout --ours ttf_prices.db docs/data/ttf.json docs/data/entsoe.json
+              git add ttf_prices.db docs/data/ttf.json docs/data/entsoe.json
+              git commit --no-edit
+            }
+            sleep $((attempt * 3))
+          done
+          echo "Failed to push after multiple attempts."
+          exit 1
 
       - name: Upload CSV artifact
         uses: actions/upload-artifact@v7
