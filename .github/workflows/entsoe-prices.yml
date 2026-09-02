@@ -5,7 +5,12 @@ on:
     # the day before delivery. Run once in the afternoon (13:30 UTC) to
     # pick up tomorrow's prices as soon as they land.
     - cron: "30 13 * * *"
-  workflow_dispatch: {}  # allows manual "Run workflow" trigger from the Actions tab
+  workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "Optional: backfill the last N days instead of the normal today/tomorrow fetch (leave empty for normal run)"
+        required: false
+        type: string
 permissions:
   contents: write  # needed to commit entsoe_prices.db back to the repo
 jobs:
@@ -22,13 +27,20 @@ jobs:
       - name: Install dependencies
         run: pip install requests
       - name: Fetch tomorrow's prices
+        if: ${{ github.event.inputs.backfill_days == '' }}
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
         run: python entsoe_prices.py --tomorrow --store
       - name: Fetch today's prices too (backfill in case tomorrow wasn't published yet)
+        if: ${{ github.event.inputs.backfill_days == '' }}
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
         run: python entsoe_prices.py --store
+      - name: Manual backfill (N days, from workflow_dispatch input)
+        if: ${{ github.event.inputs.backfill_days != '' }}
+        env:
+          ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
+        run: python entsoe_prices.py --backfill-days ${{ github.event.inputs.backfill_days }}
       - name: Export prices to CSV
         run: |
           python - <<'PY'
