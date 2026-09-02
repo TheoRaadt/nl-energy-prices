@@ -19,6 +19,7 @@ import argparse
 import os
 import sqlite3
 import sys
+import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -43,10 +44,41 @@ CREATE TABLE IF NOT EXISTS entsoe_prices (
 );
 """
 
+
 # ENTSO-E's XML uses a namespace that changes with schema version;
 # wildcard-match the local tag name instead of hardcoding it.
 def _local(tag: str) -> str:
     return tag.split("}", 1)[-1] if "}" in tag else tag
+
+
+def _get_with_retry(
+    url: str,
+    params: dict,
+    timeout: int = 30,
+    retries: int = 3,
+    backoff: int = 5,
+) -> requests.Response:
+    """GET with a longer timeout and retry-with-backoff on read timeouts.
+
+    ENTSO-E occasionally takes >20s to respond around publication time;
+    a single slow response shouldn't fail the whole workflow run.
+    """
+    last_exc = None
+    for attempt in range(1, retries + 1):
+        try:
+            return requests.get(url, params=params, timeout=timeout)
+        except requests.exceptions.ReadTimeout as exc:
+            last_exc = exc
+            if attempt == retries:
+                raise
+            wait = backoff * attempt
+            print(
+                f"Read timeout (attempt {attempt}/{retries}), retrying in {wait}s...",
+                file=sys.stderr,
+            )
+            time.sleep(wait)
+    # Unreachable, but keeps type-checkers happy.
+    raise last_exc  # type: ignore[misc]
 
 
 def fetch_day_ahead_prices(target_date: date, api_key: str) -> list[dict]:
@@ -70,7 +102,7 @@ def fetch_day_ahead_prices(target_date: date, api_key: str) -> list[dict]:
         "periodEnd": period_end,
     }
 
-    response = requests.get(API_URL, params=params, timeout=20)
+    response = _get_with_retry(API_URL, params, timeout=30, retries=3, backoff=5)
 
     if response.status_code != 200:
         # ENTSO-E returns an Acknowledgement_MarketDocument with a Reason
