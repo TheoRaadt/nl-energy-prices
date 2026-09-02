@@ -37,14 +37,14 @@ jobs:
           from pathlib import Path
           conn = sqlite3.connect("entsoe_prices.db")
           rows = conn.execute(
-              "SELECT date, hour, timestamp_utc, price_eur_per_mwh, fetched_at "
-              "FROM entsoe_prices ORDER BY date, hour"
+              "SELECT date, hour, minute, timestamp_utc, price_eur_per_mwh, fetched_at "
+              "FROM entsoe_prices ORDER BY date, hour, minute"
           ).fetchall()
           conn.close()
           Path("entsoe_prices_export.csv").write_text("")
           with open("entsoe_prices_export.csv", "w", newline="") as f:
               writer = csv.writer(f)
-              writer.writerow(["date", "hour", "timestamp_utc", "price_eur_per_mwh", "fetched_at"])
+              writer.writerow(["date", "hour", "minute", "timestamp_utc", "price_eur_per_mwh", "fetched_at"])
               writer.writerows(rows)
           PY
       - name: Upload CSV as workflow artifact
