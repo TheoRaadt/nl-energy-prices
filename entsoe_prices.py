@@ -209,6 +209,7 @@ def main() -> None:
     parser.add_argument("--from-date", type=str, default=None, help="Backfill start date YYYY-MM-DD (inclusive). Use with --to-date.")
     parser.add_argument("--to-date", type=str, default=None, help="Backfill end date YYYY-MM-DD (inclusive). Use with --from-date.")
     parser.add_argument("--backfill-months", type=int, default=None, help="Backfill the last N months up to yesterday and store them (shortcut for --from-date/--to-date --store).")
+    parser.add_argument("--backfill-days", type=int, default=None, help="Backfill the last N days up to yesterday and store them (shortcut for --from-date/--to-date --store).")
     parser.add_argument("--json", action="store_true", help="Print raw JSON instead of a table.")
     parser.add_argument("--store", action="store_true", help="Store results in entsoe_prices.db (SQLite).")
     parser.add_argument("--api-key", type=str, default=None, help="ENTSO-E security token (default: ENTSOE_API_KEY env var).")
@@ -221,9 +222,13 @@ def main() -> None:
 
     today = datetime.now(tz=AMSTERDAM).date()
 
-    # --backfill-months N is a shortcut: today minus N months, up to yesterday,
-    # stored automatically (today itself may not be published yet).
+    # --backfill-months / --backfill-days N is a shortcut: today minus N
+    # months/days, up to yesterday, stored automatically (today itself may
+    # not be published yet).
     do_store = args.store
+    if args.backfill_months is not None and args.backfill_days is not None:
+        print("Use only one of --backfill-months or --backfill-days.", file=sys.stderr)
+        sys.exit(1)
     if args.backfill_months is not None:
         if args.from_date or args.to_date:
             print("--backfill-months cannot be combined with --from-date/--to-date.", file=sys.stderr)
@@ -242,6 +247,18 @@ def main() -> None:
         day_of_month = min(today.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
                                         31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
         start = date(year, month, day_of_month)
+        args.from_date = start.isoformat()
+        args.to_date = end.isoformat()
+        do_store = True
+    elif args.backfill_days is not None:
+        if args.from_date or args.to_date:
+            print("--backfill-days cannot be combined with --from-date/--to-date.", file=sys.stderr)
+            sys.exit(1)
+        if args.backfill_days <= 0:
+            print("--backfill-days must be a positive integer.", file=sys.stderr)
+            sys.exit(1)
+        end = today - timedelta(days=1)
+        start = end - timedelta(days=args.backfill_days - 1)
         args.from_date = start.isoformat()
         args.to_date = end.isoformat()
         do_store = True
