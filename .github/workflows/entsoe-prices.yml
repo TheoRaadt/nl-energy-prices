@@ -61,4 +61,22 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add entsoe_prices.db docs/data/entsoe.json docs/data/ttf.json
           git diff --staged --quiet || git commit -m "Update ENTSO-E prices $(date -u +%Y-%m-%d)"
-          git push
+
+          # The push can be rejected if main moved since checkout (e.g. a
+          # manual push landed in the meantime). Retry a few times, always
+          # keeping this run's freshly-fetched files on conflict.
+          for attempt in 1 2 3 4 5; do
+            if git push; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt/5), fetching and retrying..."
+            git fetch origin main
+            git merge -X ours --no-edit origin/main || {
+              git checkout --ours entsoe_prices.db docs/data/entsoe.json docs/data/ttf.json
+              git add entsoe_prices.db docs/data/entsoe.json docs/data/ttf.json
+              git commit --no-edit
+            }
+            sleep $((attempt * 3))
+          done
+          echo "Failed to push after multiple attempts."
+          exit 1
