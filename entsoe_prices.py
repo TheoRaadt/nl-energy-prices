@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """Fetch NL day-ahead electricity prices from the ENTSO-E Transparency Platform.
 
@@ -204,6 +203,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Fetch NL day-ahead prices from ENTSO-E.")
     parser.add_argument("--date", type=str, default=None, help="Target date YYYY-MM-DD (default: today, Europe/Amsterdam).")
     parser.add_argument("--tomorrow", action="store_true", help="Fetch tomorrow's prices instead of today's.")
+    parser.add_argument("--from-date", type=str, default=None, help="Backfill start date YYYY-MM-DD (inclusive). Use with --to-date.")
+    parser.add_argument("--to-date", type=str, default=None, help="Backfill end date YYYY-MM-DD (inclusive). Use with --from-date.")
+    parser.add_argument("--backfill-months", type=int, default=None, help="Backfill the last N months up to yesterday and store them (shortcut for --from-date/--to-date --store).")
     parser.add_argument("--json", action="store_true", help="Print raw JSON instead of a table.")
     parser.add_argument("--store", action="store_true", help="Store results in entsoe_prices.db (SQLite).")
     parser.add_argument("--api-key", type=str, default=None, help="ENTSO-E security token (default: ENTSOE_API_KEY env var).")
@@ -215,6 +217,77 @@ def main() -> None:
         sys.exit(1)
 
     today = datetime.now(tz=AMSTERDAM).date()
+
+    # --backfill-months N is a shortcut: today minus N months, up to yesterday,
+    # stored automatically (today itself may not be published yet).
+    do_store = args.store
+    if args.backfill_months is not None:
+        if args.from_date or args.to_date:
+            print("--backfill-months cannot be combined with --from-date/--to-date.", file=sys.stderr)
+            sys.exit(1)
+        if args.backfill_months <= 0:
+            print("--backfill-months must be a positive integer.", file=sys.stderr)
+            sys.exit(1)
+        end = today - timedelta(days=1)
+        # Subtract N months from today by rolling back through month boundaries,
+        # clamping the day-of-month (e.g. Mar 31 - 1 month -> Feb 28/29).
+        year = today.year
+        month = today.month - args.backfill_months
+        while month <= 0:
+            month += 12
+            year -= 1
+        day_of_month = min(today.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+                                        31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+        start = date(year, month, day_of_month)
+        args.from_date = start.isoformat()
+        args.to_date = end.isoformat()
+        do_store = True
+
+    # Backfill mode: loop over an inclusive date range and store each day.
+    if args.from_date or args.to_date:
+        if not (args.from_date and args.to_date):
+            print("Both --from-date and --to-date are required for a range backfill.", file=sys.stderr)
+            sys.exit(1)
+        start = date.fromisoformat(args.from_date)
+        end = date.fromisoformat(args.to_date)
+        if end < start:
+            print("--to-date must not be before --from-date.", file=sys.stderr)
+            sys.exit(1)
+
+        print(f"Backfilling {start} through {end} ({(end - start).days + 1} days)...")
+        day = start
+        failures = []
+        while day <= end:
+            try:
+                prices = fetch_day_ahead_prices(day, api_key)
+            except (requests.RequestException, RuntimeError) as exc:
+                print(f"{day}: failed ({exc})", file=sys.stderr)
+                failures.append(day)
+                day += timedelta(days=1)
+                continue
+
+            if not prices:
+                print(f"{day}: no prices returned (not published, or wrong domain/token)", file=sys.stderr)
+                failures.append(day)
+                day += timedelta(days=1)
+                continue
+
+            if do_store:
+                count = store_prices(prices, day)
+                print(f"{day}: stored {count} hourly prices")
+            else:
+                print(f"{day}: fetched {len(prices)} hourly prices (pass --store to save)")
+
+            day += timedelta(days=1)
+            if day <= end:
+                time.sleep(1)  # be polite to the API between requests
+
+        if failures:
+            print(f"Done with {len(failures)} failed day(s): {', '.join(str(d) for d in failures)}", file=sys.stderr)
+            sys.exit(1)
+        print("Backfill complete.")
+        return
+
     if args.date:
         target_date = date.fromisoformat(args.date)
     elif args.tomorrow:
@@ -251,4 +324,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
