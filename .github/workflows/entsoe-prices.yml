@@ -33,6 +33,10 @@ jobs:
         run: python entsoe_prices.py --tomorrow --store
       - name: Fetch today's prices too (backfill in case tomorrow wasn't published yet)
         if: ${{ github.event.inputs.backfill_days == '' }}
+        continue-on-error: true  # this is just a safety net; today's data is usually
+                                  # already stored from a previous run, so a failure
+                                  # here (e.g. a transient empty response) must not
+                                  # block CSV export / commit / push below
         env:
           ENTSOE_API_KEY: ${{ secrets.ENTSOE_API_KEY }}
         run: python entsoe_prices.py --store
