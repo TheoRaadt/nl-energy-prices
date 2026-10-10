@@ -15,7 +15,7 @@ permissions:
   contents: write  # needed to commit entsoe_prices.db back to the repo
 jobs:
   fetch-prices:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20  # fail fast instead of hanging if a runner never gets acquired
     steps:
       - name: Check out repo
